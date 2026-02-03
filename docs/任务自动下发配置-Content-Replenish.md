@@ -386,3 +386,597 @@ public class AmrTaskCreateResponseVo {
 | 基线 | 16 |
 | 弱口令 | 17 |
 | 防火墙 | 20 |
+
+---
+
+## 6. 相关表结构汇总
+
+### 6.1 工具相关表（8张）
+
+| 表名 | 说明 |
+|------|------|
+| `RPA_ABILITY_BASIC` | 能力/工具基础表（主表） |
+| `RPA_ABILITY_TYPE` | 能力类型表（专题分类） |
+| `RPA_ABILITY_GA_RE` | 能力与版本关联表 |
+| `RPA_ABILITY_GA_VER` | 能力版本表 |
+| `RPA_ABILITY_GA` | 能力GA表 |
+| `RPA_ABILITY_PROVIDER` | 能力提供商表 |
+| `RPA_ABILITY_ACCESS_RE` | 能力接入关联表 |
+| `RPA_ABILITY_ACCESS` | 能力接入表 |
+
+### 6.2 模板相关视图（1个）
+
+| 视图名 | 说明 |
+|--------|------|
+| `view_ability_template` | 能力模板视图 |
+
+### 6.3 资产相关表（7张）
+
+| 表名 | 说明 |
+|------|------|
+| `g_asset` | 资产表 |
+| `g_asset_type` | 资产类型表 |
+| `g_asset_group` | 资产组表（业务系统） |
+| `g_asset_assetgroup_rel` | 资产与资产组关联表（group_type=2 表示业务系统） |
+| `g_asset_extend_prop` | 资产扩展属性表（用于查询是否上报，prop_code='REPORT_STATUS'） |
+| `bd_checkitem` | 检查项表（基线 property=0，弱口令 property=9） |
+| `bd_checkitem_related` | 检查项关联表（关联资产类型 pk_so） |
+
+
+
+相关表结构
+
+ SELECT b.type_name,
+    b.type_code,
+    b.pk_ability_type,
+    a.ability_name,
+    a.ability_code,
+    string_agg(DISTINCT ''::text || a.pk_ability_basic::text, ','::text) AS pk_ability_basic
+   FROM rpa_ability_basic a
+     LEFT JOIN rpa_ability_type b ON a.pk_ability_type = b.pk_ability_type
+  GROUP BY a.ability_name, a.ability_code, b.type_name, b.type_code, b.pk_ability_type
+;
+
+
+
+
+ SELECT all_template.foreign_template_id,
+    all_template.foreign_template_name,
+    all_template.pk_ability_ga_re,
+    all_template.pk_ability_ga_ver,
+    all_template.pk_ability_basic,
+    all_template.ability_name,
+    all_template.ability_code,
+    all_template.type_code,
+    all_template.source_form,
+    all_template.is_default
+   FROM ( SELECT tem.foreign_template_id,
+            tem.foreign_template_name,
+            tem.pk_ability_ga_re,
+            agr.pk_ability_ga_ver,
+            agr.pk_ability_basic,
+            rab.ability_name,
+            rab.ability_code,
+            rat.type_code,
+            0 AS source_form,
+            '-1'::integer AS is_default
+           FROM sc_template tem
+             LEFT JOIN rpa_ability_ga_re agr ON agr.pk_ability_ga_re = tem.pk_ability_ga_re
+             LEFT JOIN rpa_ability_basic rab ON agr.pk_ability_basic = rab.pk_ability_basic
+             LEFT JOIN rpa_ability_type rat ON rab.pk_ability_type = rat.pk_ability_type
+          GROUP BY tem.foreign_template_id, tem.foreign_template_name, tem.pk_ability_ga_re, agr.pk_ability_ga_ver, agr.pk_ability_basic, rab.ability_name, rab.ability_code, rat.type_code
+        UNION ALL
+         SELECT a.pk_task_template AS foreign_template_id,
+            a.task_template_name AS foreign_template_name,
+            b.pk_ability_ga_re,
+            b.pk_ability_ga_ver,
+            b.pk_ability_basic,
+            b.ability_name,
+            b.ability_code,
+            b.type_code,
+                CASE
+                    WHEN a.is_internal = '1'::smallint THEN 0
+                    ELSE 1
+                END AS source_form,
+                CASE
+                    WHEN a.is_default = '1'::smallint THEN 1
+                    ELSE 0
+                END AS is_default
+           FROM rs_task_template a
+             JOIN ( SELECT 0 AS is_delete,
+                    b_1.pk_ability_ga_re,
+                    b_1.pk_ability_ga_ver,
+                    b_1.pk_ability_basic,
+                    a_1.ability_name,
+                    a_1.ability_code,
+                    e.type_code
+                   FROM rpa_ability_basic a_1
+                     JOIN rpa_ability_ga_re b_1 ON a_1.pk_ability_basic = b_1.pk_ability_basic
+                     JOIN rpa_ability_ga_ver c ON c.pk_ability_ga_ver = b_1.pk_ability_ga_ver
+                     JOIN rpa_ability_type e ON e.pk_ability_type = a_1.pk_ability_type
+                  WHERE a_1.ability_code::text = 'ULTRA_ASSET_FOUND'::text AND c.ver_code::text = 'V1.0'::text) b ON a.is_delete = b.is_delete
+          WHERE a.is_delete = 0 AND a.is_disabled = 0
+        UNION ALL
+         SELECT a.pk_collect_template AS foreign_template_id,
+            a.template_name AS foreign_template_name,
+            b.pk_ability_ga_re,
+            b.pk_ability_ga_ver,
+            b.pk_ability_basic,
+            b.ability_name,
+            b.ability_code,
+            b.type_code,
+                CASE
+                    WHEN a.template_type = '0'::smallint THEN 0
+                    ELSE 1
+                END AS source_form,
+                CASE
+                    WHEN a.is_default = '1'::smallint THEN 1
+                    ELSE 0
+                END AS is_default
+           FROM ac_collect_template a
+             JOIN ( SELECT 0 AS is_delete,
+                    b_1.pk_ability_ga_re,
+                    b_1.pk_ability_ga_ver,
+                    b_1.pk_ability_basic,
+                    a_1.ability_name,
+                    a_1.ability_code,
+                    e.type_code
+                   FROM rpa_ability_basic a_1
+                     JOIN rpa_ability_ga_re b_1 ON a_1.pk_ability_basic = b_1.pk_ability_basic
+                     JOIN rpa_ability_ga_ver c ON c.pk_ability_ga_ver = b_1.pk_ability_ga_ver
+                     JOIN rpa_ability_type e ON e.pk_ability_type = a_1.pk_ability_type
+                  WHERE a_1.ability_code::text = 'ULTRA_ASSET_COLLECT'::text AND c.ver_code::text = 'V1.0'::text) b ON a.is_delete = b.is_delete
+          WHERE a.is_delete = 0 AND a.is_use = 1
+        UNION ALL
+         SELECT a.pk_handbook AS foreign_template_id,
+            a.name AS foreign_template_name,
+            b.pk_ability_ga_re,
+            b.pk_ability_ga_ver,
+            b.pk_ability_basic,
+            b.ability_name,
+            b.ability_code,
+            b.type_code,
+                CASE
+                    WHEN a.source = '0'::smallint THEN 0
+                    ELSE 1
+                END AS source_form,
+                CASE
+                    WHEN a.is_default = '1'::smallint THEN 1
+                    ELSE 0
+                END AS is_default
+           FROM bd_handbook a
+             JOIN ( SELECT 0 AS is_delete,
+                    b_1.pk_ability_ga_re,
+                    b_1.pk_ability_ga_ver,
+                    b_1.pk_ability_basic,
+                    a_1.ability_name,
+                    a_1.ability_code,
+                    e.type_code
+                   FROM rpa_ability_basic a_1
+                     JOIN rpa_ability_ga_re b_1 ON a_1.pk_ability_basic = b_1.pk_ability_basic
+                     JOIN rpa_ability_ga_ver c ON c.pk_ability_ga_ver = b_1.pk_ability_ga_ver
+                     JOIN rpa_ability_type e ON e.pk_ability_type = a_1.pk_ability_type
+                  WHERE a_1.ability_code::text = 'ULTRA_CONFIG_CHECK'::text AND c.ver_code::text = 'V1.0'::text) b ON a.is_delete = b.is_delete
+          WHERE a.is_delete = 0 AND a.is_use = 1
+        UNION ALL
+         SELECT a.pk_handbook AS foreign_template_id,
+            a.name AS foreign_template_name,
+            b.pk_ability_ga_re,
+            b.pk_ability_ga_ver,
+            b.pk_ability_basic,
+            b.ability_name,
+            b.ability_code,
+            b.type_code,
+                CASE
+                    WHEN a.source = '0'::smallint THEN 0
+                    ELSE 1
+                END AS source_form,
+                CASE
+                    WHEN a.is_default = '1'::smallint THEN 1
+                    ELSE 0
+                END AS is_default
+           FROM bd_handbook a
+             JOIN ( SELECT 0 AS is_delete,
+                    b_1.pk_ability_ga_re,
+                    b_1.pk_ability_ga_ver,
+                    b_1.pk_ability_basic,
+                    a_1.ability_name,
+                    a_1.ability_code,
+                    e.type_code
+                   FROM rpa_ability_basic a_1
+                     JOIN rpa_ability_ga_re b_1 ON a_1.pk_ability_basic = b_1.pk_ability_basic
+                     JOIN rpa_ability_ga_ver c ON c.pk_ability_ga_ver = b_1.pk_ability_ga_ver
+                     JOIN rpa_ability_type e ON e.pk_ability_type = a_1.pk_ability_type
+                  WHERE a_1.ability_code::text = 'ULTRA_CLOUD_NATIVE'::text AND c.ver_code::text = 'V1.0'::text) b ON a.is_delete = b.is_delete
+          WHERE a.is_delete = 0 AND a.is_use = 1 AND a.name::text ~~ '云原生_%'::text
+        UNION ALL
+         SELECT a.pk_handbook AS foreign_template_id,
+            a.name AS foreign_template_name,
+            b.pk_ability_ga_re,
+            b.pk_ability_ga_ver,
+            b.pk_ability_basic,
+            b.ability_name,
+            b.ability_code,
+            b.type_code,
+                CASE
+                    WHEN a.source = '0'::smallint THEN 0
+                    ELSE 1
+                END AS source_form,
+                CASE
+                    WHEN a.is_default = '1'::smallint THEN 1
+                    ELSE 0
+                END AS is_default
+           FROM bd_handbook a
+             JOIN ( SELECT 0 AS is_delete,
+                    b_1.pk_ability_ga_re,
+                    b_1.pk_ability_ga_ver,
+                    b_1.pk_ability_basic,
+                    a_1.ability_name,
+                    a_1.ability_code,
+                    e.type_code
+                   FROM rpa_ability_basic a_1
+                     JOIN rpa_ability_ga_re b_1 ON a_1.pk_ability_basic = b_1.pk_ability_basic
+                     JOIN rpa_ability_ga_ver c ON c.pk_ability_ga_ver = b_1.pk_ability_ga_ver
+                     JOIN rpa_ability_type e ON e.pk_ability_type = a_1.pk_ability_type
+                  WHERE a_1.ability_code::text = 'ULTRA_CONFIG_OFFLINE_CHECK'::text AND c.ver_code::text = 'V1.0'::text) b ON a.is_delete = b.is_delete
+          WHERE a.is_delete = 0 AND a.is_use = 1
+        UNION ALL
+         SELECT a.pk_rule_template AS foreign_template_id,
+            a.template_name AS foreign_template_name,
+            b.pk_ability_ga_re,
+            b.pk_ability_ga_ver,
+            b.pk_ability_basic,
+            b.ability_name,
+            b.ability_code,
+            b.type_code,
+                CASE
+                    WHEN a.template_type = 0::numeric THEN 0
+                    ELSE 1
+                END AS source_form,
+                CASE
+                    WHEN a.is_default = '1'::numeric THEN 1
+                    ELSE 0
+                END AS is_default
+           FROM f_policy_rule_template a
+             JOIN ( SELECT 0 AS is_delete,
+                    b_1.pk_ability_ga_re,
+                    b_1.pk_ability_ga_ver,
+                    b_1.pk_ability_basic,
+                    a_1.ability_name,
+                    a_1.ability_code,
+                    e.type_code
+                   FROM rpa_ability_basic a_1
+                     JOIN rpa_ability_ga_re b_1 ON a_1.pk_ability_basic = b_1.pk_ability_basic
+                     JOIN rpa_ability_ga_ver c ON c.pk_ability_ga_ver = b_1.pk_ability_ga_ver
+                     JOIN rpa_ability_type e ON e.pk_ability_type = a_1.pk_ability_type
+                  WHERE a_1.ability_code::text = 'ULTRA_FIREWALL_CHECK'::text AND c.ver_code::text = 'V1.0'::text) b ON a.is_deleted = b.is_delete::numeric
+          WHERE a.is_deleted = 0::numeric AND a.is_enable = 1::numeric
+        UNION ALL
+         SELECT a.pk_rule_template AS foreign_template_id,
+            a.template_name AS foreign_template_name,
+            b.pk_ability_ga_re,
+            b.pk_ability_ga_ver,
+            b.pk_ability_basic,
+            b.ability_name,
+            b.ability_code,
+            b.type_code,
+                CASE
+                    WHEN a.template_type = 0::numeric THEN 0
+                    ELSE 1
+                END AS source_form,
+                CASE
+                    WHEN a.is_default = '1'::numeric THEN 1
+                    ELSE 0
+                END AS is_default
+           FROM f_policy_rule_template a
+             JOIN ( SELECT 0 AS is_delete,
+                    b_1.pk_ability_ga_re,
+                    b_1.pk_ability_ga_ver,
+                    b_1.pk_ability_basic,
+                    a_1.ability_name,
+                    a_1.ability_code,
+                    e.type_code
+                   FROM rpa_ability_basic a_1
+                     JOIN rpa_ability_ga_re b_1 ON a_1.pk_ability_basic = b_1.pk_ability_basic
+                     JOIN rpa_ability_ga_ver c ON c.pk_ability_ga_ver = b_1.pk_ability_ga_ver
+                     JOIN rpa_ability_type e ON e.pk_ability_type = a_1.pk_ability_type
+                  WHERE a_1.ability_code::text = 'ULTRA_FIREWALL_OFFLINE_CHECK'::text AND c.ver_code::text = 'V1.0'::text) b ON a.is_deleted = b.is_delete::numeric
+          WHERE a.is_deleted = 0::numeric AND a.is_enable = 1::numeric
+        UNION ALL
+         SELECT a.pk_weak_template AS foreign_template_id,
+            a.template_name AS foreign_template_name,
+            b.pk_ability_ga_re,
+            b.pk_ability_ga_ver,
+            b.pk_ability_basic,
+            b.ability_name,
+            b.ability_code,
+            b.type_code,
+                CASE
+                    WHEN a.template_type = 0 THEN 0
+                    ELSE 1
+                END AS source_form,
+                CASE
+                    WHEN a.is_default = 1 THEN 1
+                    ELSE 0
+                END AS is_default
+           FROM weak_template a
+             JOIN ( SELECT 0 AS is_delete,
+                    b_1.pk_ability_ga_re,
+                    b_1.pk_ability_ga_ver,
+                    b_1.pk_ability_basic,
+                    a_1.ability_name,
+                    a_1.ability_code,
+                    e.type_code
+                   FROM rpa_ability_basic a_1
+                     JOIN rpa_ability_ga_re b_1 ON a_1.pk_ability_basic = b_1.pk_ability_basic
+                     JOIN rpa_ability_ga_ver c ON c.pk_ability_ga_ver = b_1.pk_ability_ga_ver
+                     JOIN rpa_ability_type e ON e.pk_ability_type = a_1.pk_ability_type
+                  WHERE a_1.ability_code::text = 'ULTRA_PWD_CHECK'::text AND c.ver_code::text = 'V1.0'::text) b ON a.is_delete = b.is_delete
+          WHERE a.is_delete = 0 AND a.is_use = 1
+        UNION ALL
+         SELECT a.pk_weak_template AS foreign_template_id,
+            a.template_name AS foreign_template_name,
+            b.pk_ability_ga_re,
+            b.pk_ability_ga_ver,
+            b.pk_ability_basic,
+            b.ability_name,
+            b.ability_code,
+            b.type_code,
+                CASE
+                    WHEN a.template_type = 0 THEN 0
+                    ELSE 1
+                END AS source_form,
+                CASE
+                    WHEN a.is_default = 1 THEN 1
+                    ELSE 0
+                END AS is_default
+           FROM weak_template a
+             JOIN ( SELECT 0 AS is_delete,
+                    b_1.pk_ability_ga_re,
+                    b_1.pk_ability_ga_ver,
+                    b_1.pk_ability_basic,
+                    a_1.ability_name,
+                    a_1.ability_code,
+                    e.type_code
+                   FROM rpa_ability_basic a_1
+                     JOIN rpa_ability_ga_re b_1 ON a_1.pk_ability_basic = b_1.pk_ability_basic
+                     JOIN rpa_ability_ga_ver c ON c.pk_ability_ga_ver = b_1.pk_ability_ga_ver
+                     JOIN rpa_ability_type e ON e.pk_ability_type = a_1.pk_ability_type
+                  WHERE a_1.ability_code::text = 'ULTRA_PWD_OFFLINE_CHECK'::text AND c.ver_code::text = 'V1.0'::text) b ON a.is_delete = b.is_delete
+          WHERE a.is_delete = 0 AND a.is_use = 1
+        UNION ALL
+         SELECT a.pk_ca_template AS foreign_template_id,
+            a.template_name AS foreign_template_name,
+            b.pk_ability_ga_re,
+            b.pk_ability_ga_ver,
+            b.pk_ability_basic,
+            b.ability_name,
+            b.ability_code,
+            b.type_code,
+                CASE
+                    WHEN a.template_type = '0'::smallint THEN 0
+                    ELSE 1
+                END AS source_form,
+                CASE
+                    WHEN a.is_default = '1'::smallint THEN 1
+                    ELSE 0
+                END AS is_default
+           FROM ca_template a
+             JOIN ( SELECT 0 AS is_delete,
+                    b_1.pk_ability_ga_re,
+                    b_1.pk_ability_ga_ver,
+                    b_1.pk_ability_basic,
+                    a_1.ability_name,
+                    a_1.ability_code,
+                    e.type_code
+                   FROM rpa_ability_basic a_1
+                     JOIN rpa_ability_ga_re b_1 ON a_1.pk_ability_basic = b_1.pk_ability_basic
+                     JOIN rpa_ability_ga_ver c ON c.pk_ability_ga_ver = b_1.pk_ability_ga_ver
+                     JOIN rpa_ability_type e ON e.pk_ability_type = a_1.pk_ability_type
+                  WHERE a_1.ability_code::text = 'ULTRA_ASSET_ANALY'::text AND c.ver_code::text = 'V1.0'::text) b ON a.is_delete = b.is_delete
+          WHERE a.is_delete = 0 AND a.is_use = 1
+        UNION ALL
+         SELECT a.pk_poc_template AS foreign_template_id,
+            a.template_name AS foreign_template_name,
+            b.pk_ability_ga_re,
+            b.pk_ability_ga_ver,
+            b.pk_ability_basic,
+            b.ability_name,
+            b.ability_code,
+            b.type_code,
+                CASE
+                    WHEN a.template_type = 0 THEN 0
+                    ELSE 1
+                END AS source_form,
+                CASE
+                    WHEN a.is_default = 1 THEN 1
+                    ELSE 0
+                END AS is_default
+           FROM poc_template a
+             JOIN ( SELECT 0 AS is_delete,
+                    b_1.pk_ability_ga_re,
+                    b_1.pk_ability_ga_ver,
+                    b_1.pk_ability_basic,
+                    a_1.ability_name,
+                    a_1.ability_code,
+                    e.type_code
+                   FROM rpa_ability_basic a_1
+                     JOIN rpa_ability_ga_re b_1 ON a_1.pk_ability_basic = b_1.pk_ability_basic
+                     JOIN rpa_ability_ga_ver c ON c.pk_ability_ga_ver = b_1.pk_ability_ga_ver
+                     JOIN rpa_ability_type e ON e.pk_ability_type = a_1.pk_ability_type
+                  WHERE a_1.ability_code::text = 'ULTRA_POC_CHECK'::text AND c.ver_code::text = 'V1.0'::text) b ON a.is_delete = b.is_delete
+          WHERE a.is_delete = 0 AND a.is_use = 1
+        UNION ALL
+         SELECT a.pk_sd_template AS foreign_template_id,
+            a.template_name AS foreign_template_name,
+            b.pk_ability_ga_re,
+            b.pk_ability_ga_ver,
+            b.pk_ability_basic,
+            b.ability_name,
+            b.ability_code,
+            b.type_code,
+                CASE
+                    WHEN a.template_type = 0 THEN 0
+                    ELSE 1
+                END AS source_form,
+                CASE
+                    WHEN a.is_default = 1 THEN 1
+                    ELSE 0
+                END AS is_default
+           FROM sd_template a
+             JOIN ( SELECT 0 AS is_delete,
+                    b_1.pk_ability_ga_re,
+                    b_1.pk_ability_ga_ver,
+                    b_1.pk_ability_basic,
+                    a_1.ability_name,
+                    a_1.ability_code,
+                    e.type_code
+                   FROM rpa_ability_basic a_1
+                     JOIN rpa_ability_ga_re b_1 ON a_1.pk_ability_basic = b_1.pk_ability_basic
+                     JOIN rpa_ability_ga_ver c ON c.pk_ability_ga_ver = b_1.pk_ability_ga_ver
+                     JOIN rpa_ability_type e ON e.pk_ability_type = a_1.pk_ability_type
+                  WHERE a_1.ability_code::text = 'ULTRA_EXPOSE_MAPPING'::text AND c.ver_code::text = 'V1.0'::text) b ON a.is_deleted = b.is_delete
+          WHERE a.is_deleted = 0 AND a.is_use = 1) all_template
+     LEFT JOIN ( SELECT sy.pk_template,
+            count(1) AS total_num,
+            sum(
+                CASE
+                    WHEN sy.sync_status = 2 THEN 1
+                    ELSE 0
+                END) AS sync_num
+           FROM bms_template_tool_sync sy
+             LEFT JOIN rpa_ability_access b ON sy.pk_ability_access = b.pk_ability_access
+          WHERE b.ability_status <> 0 AND b.is_deleted = 0
+          GROUP BY sy.pk_template) syn_template ON syn_template.pk_template = all_template.foreign_template_id::bpchar
+  WHERE all_template.source_form = 0 OR all_template.source_form <> 0 AND syn_template.sync_num = syn_template.total_num
+
+
+
+DROP TABLE IF EXISTS g_asset_type;
+CREATE TABLE g_asset_type (
+  pk_asset_type char(32) COLLATE pg_catalog.default NOT NULL,
+  type_name varchar(500) COLLATE pg_catalog.default NOT NULL,
+  type_code varchar(100) COLLATE pg_catalog.default NOT NULL,
+  type_prop numeric(2,0),
+  full_name varchar(3000) COLLATE pg_catalog.default,
+  type_desc varchar(3000) COLLATE pg_catalog.default,
+  pk_type_parent varchar(32) COLLATE pg_catalog.default,
+  seriescode varchar(3300) COLLATE pg_catalog.default,
+  display_idx int4,
+  is_view numeric(2,0),
+  come_from numeric(2,0),
+  is_deleted numeric(2,0),
+  pk_creator char(32) COLLATE pg_catalog.default,
+  create_time timestamptz(6),
+  pk_mender char(32) COLLATE pg_catalog.default,
+  mend_time_last timestamptz(6),
+  is_enable numeric(2,0),
+  reserved1 varchar(500) COLLATE pg_catalog.default,
+  reserved2 varchar(500) COLLATE pg_catalog.default,
+  foreign_id varchar(100) COLLATE pg_catalog.default,
+  foreign_md5 char(32) COLLATE pg_catalog.default,
+  is_localize numeric(2,0),
+  type_icon text COLLATE pg_catalog.default
+)
+;
+ALTER TABLE g_asset_type OWNER TO postgres;
+COMMENT ON COLUMN g_asset_type.type_prop IS '资产类型的类型：0=物理设备，1=应用软件';
+COMMENT ON COLUMN g_asset_type.pk_type_parent IS '如果是根节点，值为：-1';
+COMMENT ON COLUMN g_asset_type.is_view IS '0-不显示、1-显示';
+COMMENT ON COLUMN g_asset_type.come_from IS '0-系统内置，1-自定义';
+COMMENT ON COLUMN g_asset_type.is_deleted IS '0-未删除、1-已删除';
+COMMENT ON TABLE g_asset_type IS '新增于：2022-04-06';
+
+
+ALTER TABLE g_asset_type ADD CONSTRAINT g_asset_type_pkey PRIMARY KEY (pk_asset_type);
+
+
+
+DROP TABLE IF EXISTS g_asset_extend_prop;
+CREATE TABLE g_asset_extend_prop (
+  pk_asset_extend_prop char(32) COLLATE pg_catalog.default NOT NULL,
+  pk_asset char(32) COLLATE pg_catalog.default NOT NULL,
+  prop_code varchar(100) COLLATE pg_catalog.default NOT NULL,
+  prop_value varchar(3000) COLLATE pg_catalog.default
+)
+;
+ALTER TABLE g_asset_extend_prop OWNER TO postgres;
+
+
+CREATE INDEX idx_asset_extend_a ON g_asset_extend_prop USING btree (
+  pk_asset COLLATE pg_catalog.default pg_catalog.bpchar_ops ASC NULLS LAST
+);
+CREATE INDEX idx_asset_extend_p ON g_asset_extend_prop USING btree (
+  prop_code COLLATE pg_catalog.default pg_catalog.text_ops ASC NULLS LAST
+);
+CREATE INDEX idx_asset_extend_prop_asset_code ON g_asset_extend_prop USING btree (
+  pk_asset COLLATE pg_catalog.default pg_catalog.bpchar_ops ASC NULLS LAST,
+  prop_code COLLATE pg_catalog.default pg_catalog.text_ops ASC NULLS LAST
+);
+
+
+ALTER TABLE g_asset_extend_prop ADD CONSTRAINT pk_g_asset_extend_prop PRIMARY KEY (pk_asset_extend_prop);
+
+
+
+DROP TABLE IF EXISTS g_asset_group;
+CREATE TABLE g_asset_group (
+  pk_group char(32) COLLATE pg_catalog.default NOT NULL,
+  group_type numeric(2,0) NOT NULL,
+  group_name varchar(500) COLLATE pg_catalog.default NOT NULL,
+  group_code varchar(100) COLLATE pg_catalog.default,
+  group_desc varchar(3000) COLLATE pg_catalog.default,
+  full_name varchar(3000) COLLATE pg_catalog.default,
+  parent_group_id char(32) COLLATE pg_catalog.default,
+  series_code varchar(3300) COLLATE pg_catalog.default,
+  sequence_idx int4,
+  region_id varchar(100) COLLATE pg_catalog.default,
+  deleted_state numeric(2,0),
+  create_user char(32) COLLATE pg_catalog.default,
+  create_time timestamptz(6),
+  modify_user char(32) COLLATE pg_catalog.default,
+  modify_time timestamptz(6),
+  come_from numeric(2,0),
+  foreign_id varchar(100) COLLATE pg_catalog.default,
+  foreign_md5 char(32) COLLATE pg_catalog.default,
+  reserved1 int4,
+  reserved2 int4,
+  reserved3 varchar(500) COLLATE pg_catalog.default,
+  reserved4 varchar(500) COLLATE pg_catalog.default,
+  major_region varchar(100) COLLATE pg_catalog.default,
+  importance varchar(100) COLLATE pg_catalog.default,
+  short_name varchar(500) COLLATE pg_catalog.default,
+  group_num_id int8
+)
+;
+ALTER TABLE g_asset_group OWNER TO postgres;
+COMMENT ON COLUMN g_asset_group.group_type IS '1-组织机构、2-资产组、3-安全域';
+COMMENT ON COLUMN g_asset_group.deleted_state IS '0：未删除 1：已删除';
+
+
+CREATE INDEX idx_asset_group_seriescode ON g_asset_group USING btree (
+  series_code COLLATE pg_catalog.default pg_catalog.text_ops ASC NULLS LAST
+);
+
+
+ALTER TABLE g_asset_group ADD CONSTRAINT pk_g_asset_group PRIMARY KEY (pk_group);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
