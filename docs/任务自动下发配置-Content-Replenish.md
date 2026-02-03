@@ -424,37 +424,6 @@ GROUP BY a.ability_name, a.ability_code, b.type_name, b.type_code, b.pk_ability_
 |--------|------|
 | `view_ability_template` | 能力模板视图 |
 
-**模板视图查询**：
-
-```sql
-SELECT all_template.foreign_template_id,
-       all_template.foreign_template_name,
-       all_template.pk_ability_ga_re,
-       all_template.pk_ability_ga_ver,
-       all_template.pk_ability_basic,
-       all_template.ability_name,
-       all_template.ability_code,
-       all_template.type_code,
-       all_template.source_form,
-       all_template.is_default
-FROM (
-    SELECT tem.foreign_template_id,
-           tem.foreign_template_name,
-           tem.pk_ability_ga_re,
-           agr.pk_ability_ga_ver,
-           agr.pk_ability_basic,
-           rab.ability_name,
-           rab.ability_code,
-           rat.type_code,
-           tem.source_form,
-           tem.is_default
-    FROM rpa_ability_template tem
-    LEFT JOIN rpa_ability_ga_re agr ON tem.pk_ability_ga_re = agr.pk_ability_ga_re
-    LEFT JOIN rpa_ability_basic rab ON agr.pk_ability_basic = rab.pk_ability_basic
-    LEFT JOIN rpa_ability_type rat ON rab.pk_ability_type = rat.pk_ability_type
-) all_template;
-```
-
 ### 6.3 资产相关表（7张）
 
 | 表名 | 说明 |
@@ -467,9 +436,11 @@ FROM (
 | `bd_checkitem` | 检查项表（基线 property=0，弱口令 property=9） |
 | `bd_checkitem_related` | 检查项关联表（关联资产类型 pk_so） |
 
+### 6.4 相关表结构SQL
 
+**工具与专题关联查询**：
 
-相关表结构
+```sql
 
  SELECT b.type_name,
     b.type_code,
@@ -479,13 +450,13 @@ FROM (
     string_agg(DISTINCT ''::text || a.pk_ability_basic::text, ','::text) AS pk_ability_basic
    FROM rpa_ability_basic a
      LEFT JOIN rpa_ability_type b ON a.pk_ability_type = b.pk_ability_type
-  GROUP BY a.ability_name, a.ability_code, b.type_name, b.type_code, b.pk_ability_type
-;
+  GROUP BY a.ability_name, a.ability_code, b.type_name, b.type_code, b.pk_ability_type;
+```
 
+**模板视图完整查询（view_ability_template）**：
 
-
-
- SELECT all_template.foreign_template_id,
+```sql
+SELECT all_template.foreign_template_id,
     all_template.foreign_template_name,
     all_template.pk_ability_ga_re,
     all_template.pk_ability_ga_ver,
@@ -893,10 +864,14 @@ FROM (
              LEFT JOIN rpa_ability_access b ON sy.pk_ability_access = b.pk_ability_access
           WHERE b.ability_status <> 0 AND b.is_deleted = 0
           GROUP BY sy.pk_template) syn_template ON syn_template.pk_template = all_template.foreign_template_id::bpchar
-  WHERE all_template.source_form = 0 OR all_template.source_form <> 0 AND syn_template.sync_num = syn_template.total_num
+  WHERE all_template.source_form = 0 OR all_template.source_form <> 0 AND syn_template.sync_num = syn_template.total_num;
+```
 
+### 6.5 资产相关表DDL
 
+**资产类型表（g_asset_type）**：
 
+```sql
 DROP TABLE IF EXISTS g_asset_type;
 CREATE TABLE g_asset_type (
   pk_asset_type char(32) COLLATE pg_catalog.default NOT NULL,
@@ -934,9 +909,11 @@ COMMENT ON TABLE g_asset_type IS '新增于：2022-04-06';
 
 
 ALTER TABLE g_asset_type ADD CONSTRAINT g_asset_type_pkey PRIMARY KEY (pk_asset_type);
+```
 
+**资产扩展属性表（g_asset_extend_prop）**：
 
-
+```sql
 DROP TABLE IF EXISTS g_asset_extend_prop;
 CREATE TABLE g_asset_extend_prop (
   pk_asset_extend_prop char(32) COLLATE pg_catalog.default NOT NULL,
@@ -961,9 +938,11 @@ CREATE INDEX idx_asset_extend_prop_asset_code ON g_asset_extend_prop USING btree
 
 
 ALTER TABLE g_asset_extend_prop ADD CONSTRAINT pk_g_asset_extend_prop PRIMARY KEY (pk_asset_extend_prop);
+```
 
+**资产组表（g_asset_group）**：
 
-
+```sql
 DROP TABLE IF EXISTS g_asset_group;
 CREATE TABLE g_asset_group (
   pk_group char(32) COLLATE pg_catalog.default NOT NULL,
@@ -1006,22 +985,4 @@ CREATE INDEX idx_asset_group_seriescode ON g_asset_group USING btree (
 
 ALTER TABLE g_asset_group ADD CONSTRAINT pk_g_asset_group PRIMARY KEY (pk_group);
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
+```
