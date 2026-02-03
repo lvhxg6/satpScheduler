@@ -93,7 +93,21 @@ WHERE pk_ability_basic = 'd52b548989f44543a0b373621a5cdfec';
 
 ## 3. 资产查询
 
-### 3.1 是否上报筛选条件
+### 3.1 资产与资产组（业务系统）的表关系
+
+```sql
+SELECT ga.asset_name, gag.* 
+FROM g_asset ga 
+LEFT JOIN g_asset_assetgroup_rel gasr ON ga.pk_asset = gasr.asset_id AND gasr.group_type = 2
+LEFT JOIN g_asset_group gag ON gasr.asset_group_id = gag.pk_group
+```
+
+**说明**：
+- `g_asset`：资产表
+- `g_asset_assetgroup_rel`：资产与资产组关联表，`group_type = 2` 表示业务系统
+- `g_asset_group`：资产组表（业务系统）
+
+### 3.2 是否上报筛选条件
 
 ```java
 /** 是否上报 0 否 1 是 是否上报 REPORT_STATUS */
@@ -105,7 +119,7 @@ if (!nullOrEmpty(aqv.getReportStatus())) {
 }
 ```
 
-### 3.2 四个专题查询资产的SQL
+### 3.3 四个专题查询资产的SQL
 
 **系统漏洞**：
 
