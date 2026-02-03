@@ -404,11 +404,56 @@ public class AmrTaskCreateResponseVo {
 | `RPA_ABILITY_ACCESS_RE` | 能力接入关联表 |
 | `RPA_ABILITY_ACCESS` | 能力接入表 |
 
+**工具与专题关联查询**：
+
+```sql
+SELECT b.type_name,
+       b.type_code,
+       b.pk_ability_type,
+       a.ability_name,
+       a.ability_code,
+       string_agg(DISTINCT ''::text || a.pk_ability_basic::text, ','::text) AS pk_ability_basic
+FROM rpa_ability_basic a
+LEFT JOIN rpa_ability_type b ON a.pk_ability_type = b.pk_ability_type
+GROUP BY a.ability_name, a.ability_code, b.type_name, b.type_code, b.pk_ability_type;
+```
+
 ### 6.2 模板相关视图（1个）
 
 | 视图名 | 说明 |
 |--------|------|
 | `view_ability_template` | 能力模板视图 |
+
+**模板视图查询**：
+
+```sql
+SELECT all_template.foreign_template_id,
+       all_template.foreign_template_name,
+       all_template.pk_ability_ga_re,
+       all_template.pk_ability_ga_ver,
+       all_template.pk_ability_basic,
+       all_template.ability_name,
+       all_template.ability_code,
+       all_template.type_code,
+       all_template.source_form,
+       all_template.is_default
+FROM (
+    SELECT tem.foreign_template_id,
+           tem.foreign_template_name,
+           tem.pk_ability_ga_re,
+           agr.pk_ability_ga_ver,
+           agr.pk_ability_basic,
+           rab.ability_name,
+           rab.ability_code,
+           rat.type_code,
+           tem.source_form,
+           tem.is_default
+    FROM rpa_ability_template tem
+    LEFT JOIN rpa_ability_ga_re agr ON tem.pk_ability_ga_re = agr.pk_ability_ga_re
+    LEFT JOIN rpa_ability_basic rab ON agr.pk_ability_basic = rab.pk_ability_basic
+    LEFT JOIN rpa_ability_type rat ON rab.pk_ability_type = rat.pk_ability_type
+) all_template;
+```
 
 ### 6.3 资产相关表（7张）
 
